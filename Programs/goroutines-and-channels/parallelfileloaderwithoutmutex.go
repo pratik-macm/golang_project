@@ -25,12 +25,13 @@ type Result struct {
 
 func StoreTokenPrice() {
 
-	const worker = 20
+	const worker = 2
 	var wg sync.WaitGroup
+	var cwg sync.WaitGroup
 
 	SymbolStore = make(map[string][]float32)
 	var workerChn = make(chan (string), 20)
-	var resultChn = make(chan (Result), 20)
+	var resultChn = make(chan (Result), 2)
 
 	symbols := []string{
 		"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
@@ -39,7 +40,7 @@ func StoreTokenPrice() {
 		"TITAN", "ADANIENT", "ASIANPAINT", "HCLTECH", "ULTRACEMCO",
 	}
 	startTime := time.Now()
-	for i := 0; i < worker; i++ {
+	for i := 1; i <= worker; i++ {
 		wg.Add(1)
 		go DoJob(&wg, workerChn, resultChn, i)
 	}
@@ -51,17 +52,23 @@ func StoreTokenPrice() {
 		close(workerChn)
 	}()
 
+	cwg.Add(1)
 	go func() {
+		//this is consumer suppose it does io opearion for 2s
+		time.Sleep(time.Second * 2)
 		for result := range resultChn {
 			SymbolStore[result.Symbol] = result.Prices
-
 		}
+		defer cwg.Done()
 	}()
 
-	wg.Wait()
-	close(resultChn)
+	go func() {
+		wg.Wait()
+		close(resultChn)
+	}()
+	cwg.Wait()
 	fmt.Printf("Symbol loaded " + strconv.Itoa(len(symbols)) + " in time " + time.Since(startTime).String() + "\n")
-
+	fmt.Println(SymbolStore)
 }
 
 func DoJob(wg *sync.WaitGroup, workerCh <-chan string, result chan<- Result, workerId int) {

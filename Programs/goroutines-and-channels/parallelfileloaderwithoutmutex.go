@@ -74,7 +74,7 @@ func DoJob(wg *sync.WaitGroup, workerCh <-chan string, result chan<- Result, wor
 			Prices: prices,
 		}
 
-		fmt.Println(" WorkerId ", workerId, " symbol ", result)
+		fmt.Println(" WorkerId ", workerId, " symbol ", symbol, " Prices", prices)
 	}
 	wg.Done()
 }

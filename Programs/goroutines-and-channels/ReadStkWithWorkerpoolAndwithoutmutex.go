@@ -44,7 +44,7 @@ func StoreTokenPrice() {
 		wg.Add(1)
 		go DoJob(&wg, workerChn, resultChn, i)
 	}
-
+	
 	go func() {
 		for _, sym := range symbols {
 			workerChn <- sym

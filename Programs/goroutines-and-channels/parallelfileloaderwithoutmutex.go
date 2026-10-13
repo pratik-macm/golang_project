@@ -1,7 +1,9 @@
 package goroutinesandchannels
 
 import (
+	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -16,14 +18,19 @@ Task 2: Parallel file "loader" without mutex
 
 */
 
+type Result struct {
+	Symbol string
+	Prices []float32
+}
+
 func StoreTokenPrice() {
 
-	const worker = 3
+	const worker = 20
 	var wg sync.WaitGroup
 
 	SymbolStore = make(map[string][]float32)
-	var workerChn = make(chan (string), worker)
-	var resultChn = make(chan (map[string][]float32), worker)
+	var workerChn = make(chan (string), 20)
+	var resultChn = make(chan (Result), 20)
 
 	symbols := []string{
 		"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
@@ -31,45 +38,50 @@ func StoreTokenPrice() {
 		"AXISBANK", "KOTAKBANK", "TATAMOTORS", "MARUTI", "SUNPHARMA",
 		"TITAN", "ADANIENT", "ASIANPAINT", "HCLTECH", "ULTRACEMCO",
 	}
-
+	startTime := time.Now()
 	for i := 0; i < worker; i++ {
 		wg.Add(1)
-		go DoJob(&wg, workerChn, resultChn)
+		go DoJob(&wg, workerChn, resultChn, i)
 	}
 
-	for _, sym := range symbols {
-		workerChn <- sym
-	}
-	close(workerChn)
+	go func() {
+		for _, sym := range symbols {
+			workerChn <- sym
+		}
+		close(workerChn)
+	}()
 
 	go func() {
 		for result := range resultChn {
-			for sym, prices := range result {
-				SymbolStore[sym] = prices
-			}
+			SymbolStore[result.Symbol] = result.Prices
+
 		}
 	}()
 
-	go func() {
-		wg.Wait()
-		close(resultChn)
-	}()
+	wg.Wait()
+	close(resultChn)
+	fmt.Printf("Symbol loaded " + strconv.Itoa(len(symbols)) + " in time " + time.Since(startTime).String() + "\n")
+
 }
 
-func DoJob(wg *sync.WaitGroup, workerCh <-chan string, result chan<- map[string][]float32) {
+func DoJob(wg *sync.WaitGroup, workerCh <-chan string, result chan<- Result, workerId int) {
 
 	for symbol := range workerCh {
-		stkprices := make(map[string][]float32)
+
 		prices := ReadStkPrice(symbol)
-		stkprices[symbol] = prices
-		result <- stkprices
+		result <- Result{
+			Symbol: symbol,
+			Prices: prices,
+		}
+
+		fmt.Println(" WorkerId ", workerId, " symbol ", result)
 	}
 	wg.Done()
 }
 
 func ReadStkPrice(symbol string) []float32 {
 
-	time.Sleep(time.Millisecond * 498)
+	// time.Sleep(time.Millisecond * 498)
 	var stkprices []float32
 
 	for i := 0; i < 5; i++ {
